@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Escrow Payment Checkout</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f2f2f2;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .payment-container {
+            background: #fff;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0px 4px 20px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        input, button {
+            padding: 10px;
+            margin: 10px 0;
+            width: 250px;
+            font-size: 16px;
+        }
+
+        button {
+            border: none;
+            background: #528ff0;
+            color: white;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #3a6ed9;
+        }
+    </style>
+    
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body>
+    <div class="payment-container">
+        <h2>Pay for your order</h2>
+        <input type="text" id="order_id" placeholder="Enter Order ID from backend" />
+        <button id="payBtn">Pay Now</button>
+    </div>
+
+    <script>
+        const payBtn = document.getElementById("payBtn");
+
+        payBtn.addEventListener("click", () => {
+            const order_id = document.getElementById("order_id").value.trim();
+            if (!order_id) {
+                alert("Please enter an order ID!");
+                return;
+            }
+
+            const options = {
+                key: "rzp_test_RXEPWkaPkeDBpv", // Replace with your Razorpay Test Key
+                name: "Escrow Demo",
+                description: "Payment for order",
+                order_id: order_id,
+                handler: function (response) {
+                    alert(`Payment successful! Payment ID: ${response.razorpay_payment_id}`);
+                    console.log(response);
+                    // Optionally call backend to confirm payment
+                },
+                prefill: {
+                    name: "Test User",
+                    email: "test@example.com",
+                    contact: "9876543210"
+                },
+                theme: {
+                    color: "#528ff0"
+                }
+            };
+
+            const rzp = new Razorpay(options);
+            rzp.open();
+        });
+    </script>
+</body>
+</html>
