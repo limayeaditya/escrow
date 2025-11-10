@@ -1,5 +1,4 @@
 import requests
-from .tasks import wait_for_confirmations
 from payments.tasks import release_funds
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -44,6 +43,7 @@ class CreateDeliveryView(APIView):
             {
                 "message": "Your request has been placed successfully.",
                 "delivery_id": delivery.id,
+                "tracking_id": delivery.tracking_id,
                 "mode": delivery.mode,
                 "status": delivery.status,
             },
@@ -65,10 +65,6 @@ class PartnerCallbackView(APIView):
         delivery.status = status_update
         delivery.save()
 
-        # If marked as delivered and buyer already confirmed → release funds
-        if status_update == "DELIVERED":
-            wait_for_confirmations.apply_async(args=[delivery.id])
-
 
         return Response({"message": f"Delivery status updated to {status_update}."})
 
@@ -80,22 +76,18 @@ class BuyerConfirmDeliveryView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        delivery_id = serializer.validated_data["delivery_id"]
+        tracking_id = serializer.validated_data["tracking_id"]
         confirmed = serializer.validated_data["confirmed"]
 
-        delivery = get_object_or_404(Delivery, id=delivery_id)
+        delivery = get_object_or_404(Delivery, tracking_id=tracking_id)
         delivery.buyer_confirmed = confirmed
         delivery.save()
 
-        # Logic to release escrow:
-        # - MANUAL → release immediately if buyer confirms
-        # - PARTNER → release only if both partner delivered and buyer confirmed
         escrow_transaction = delivery.escrow_transaction
         if confirmed:
-            if delivery.mode == "MANUAL" or (delivery.mode == "PARTNER" and delivery.status == "DELIVERED"):
-                if escrow_transaction.status == "HELD":
-                    delivery.status = "DELIVERED"
-                    delivery.save()
-                    release_funds.apply_async(args=[escrow_transaction.id], countdown=100)
+            if escrow_transaction.status == "HELD":
+                delivery.status = "DELIVERED"
+                delivery.save()
+                release_funds.apply_async(args=[escrow_transaction.id], countdown=100)
 
         return Response({"message": f"Buyer confirmation recorded ({confirmed})."})
